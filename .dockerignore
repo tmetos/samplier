@@ -1,0 +1,9 @@
+.git
+.github
+ui/node_modules
+ui/dist
+infra
+assets
+**/.terraform
+coverage.out
+*.md

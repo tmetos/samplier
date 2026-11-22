@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640" role="img" aria-label="Samplier — environmental data management">
+  <title>Samplier — Environmental Data Management</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#08100f"/>
+      <stop offset="0.5" stop-color="#080d11"/>
+      <stop offset="1" stop-color="#0a1018"/>
+    </linearGradient>
+    <radialGradient id="glowGreen" cx="0.12" cy="0.88" r="0.55">
+      <stop offset="0" stop-color="#35b37e" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#35b37e" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowBlue" cx="0.92" cy="0.1" r="0.5">
+      <stop offset="0" stop-color="#4a9ee0" stop-opacity="0.20"/>
+      <stop offset="1" stop-color="#4a9ee0" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowPink" cx="0.98" cy="0.86" r="0.34">
+      <stop offset="0" stop-color="#ff5c8a" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#ff5c8a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101d1a"/>
+      <stop offset="0.55" stop-color="#0b1216"/>
+      <stop offset="1" stop-color="#0a1420"/>
+    </linearGradient>
+    <linearGradient id="liquid" x1="0" y1="0" x2="0.65" y2="1">
+      <stop offset="0" stop-color="#5ee7a8"/>
+      <stop offset="0.55" stop-color="#35b37e"/>
+      <stop offset="1" stop-color="#2f7fb0"/>
+    </linearGradient>
+    <linearGradient id="drop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#a8d4fb"/>
+      <stop offset="1" stop-color="#4a9ee0"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#35b37e"/>
+      <stop offset="1" stop-color="#6fa8dc"/>
+    </linearGradient>
+    <linearGradient id="word" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#f2f8f5"/>
+      <stop offset="1" stop-color="#c2d5e2"/>
+    </linearGradient>
+    <linearGradient id="rule" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#35b37e"/>
+      <stop offset="0.6" stop-color="#6fa8dc"/>
+      <stop offset="1" stop-color="#ff5c8a"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <rect width="1280" height="640" fill="url(#glowGreen)"/>
+  <rect width="1280" height="640" fill="url(#glowBlue)"/>
+  <rect width="1280" height="640" fill="url(#glowPink)"/>
+
+  <!-- faint data constellation: well locations -->
+  <g fill="#35b37e" opacity="0.45">
+    <circle cx="1128" cy="150" r="5.5"/>
+    <circle cx="1194" cy="196" r="5.5"/>
+    <circle cx="1216" cy="272" r="5.5"/>
+    <circle cx="1150" cy="252" r="5.5"/>
+  </g>
+  <g stroke="#35b37e" stroke-width="1.1" opacity="0.25" fill="none">
+    <path d="M1128 150 1194 196 1216 272"/>
+    <path d="M1128 150 1150 252 1216 272"/>
+  </g>
+  <g stroke="#6fa8dc" stroke-width="1.1" opacity="0.20">
+    <path d="M1194 196 1150 252"/>
+  </g>
+
+  <!-- mark: droplet with a meniscus fill line -->
+  <g transform="translate(150,168) scale(4.2)">
+    <path d="M32 6.5c0 0 18.5 23.8 18.5 33.5a18.5 18.5 0 0 1-37 0C13.5 30.3 32 6.5 32 6.5Z"
+          fill="url(#liquid)"/>
+    <path d="M16.2 35.4c5.2 4.6 10.6 6.9 15.8 6.9s10.6-2.3 15.8-6.9"
+          fill="none" stroke="#080d11" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- wordmark -->
+  <text x="430" y="300" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+        font-size="112" font-weight="700" letter-spacing="-3" fill="url(#word)">Samplier</text>
+
+  <!-- rule -->
+  <rect x="436" y="392" width="300" height="3" rx="1.5" fill="url(#rule)" opacity="0.85"/>
+
+  <!-- capability line -->
+  <text x="436" y="446" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+        font-size="23" font-weight="500" fill="#8ea3b1">Laboratory + field data · PostGIS · OGC API — Features · MCP</text>
+  <text x="436" y="484" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+        font-size="23" font-weight="500" fill="#8ea3b1">Exports: XLSX crosstab · WQX/ESAR · AQS · Washington EIM</text>
+
+  <!-- footer note -->
+  <text x="96" y="576" font-family="ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif"
+        font-size="20" font-weight="500" letter-spacing="1.2" fill="#5c7180">OPEN SOURCE · AGPL-3.0</text>
+</svg>

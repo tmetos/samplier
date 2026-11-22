@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Cross-compile and publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build binaries
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          mkdir -p dist
+          version="${GITHUB_REF_NAME#v}"
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            os="${target%/*}"; arch="${target#*/}"
+            out="dist/samplier_${version}_${os}_${arch}"
+            GOOS="$os" GOARCH="$arch" go build -trimpath \
+              -ldflags "-s -w -X main.Version=${version}" \
+              -o "$out" ./cmd/server
+            ( cd dist && shasum -a 256 "$(basename "$out")" >> checksums.txt )
+          done
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/samplier_*
+            dist/checksums.txt
+          generate_release_notes: true

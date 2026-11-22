@@ -1,0 +1,99 @@
+# Samplier — local development stack
+# Requires Docker with the Compose plugin (or the standalone docker-compose).
+#
+#   docker compose up -d              # database + Keycloak
+#   docker compose --profile obs up -d  # + OTel collector, Prometheus, Grafana, Loki
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: samplier
+      POSTGRES_PASSWORD: samplier
+      POSTGRES_DB: samplier
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "5432:5432"
+    command:
+      - postgres
+      - -c
+      - timezone=UTC
+      - -c
+      - log_min_duration_statement=1000
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./seed.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U samplier -d samplier"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    command: start-dev
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+    ports:
+      - "8081:8080"
+      - "9000:9000"
+
+  # --- observability (profile: obs) ---
+  otel-collector:
+    profiles: ["obs"]
+    image: otel/opentelemetry-collector-contrib:0.111.0
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./observability/otel-collector.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+
+  prometheus:
+    profiles: ["obs"]
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+
+  loki:
+    profiles: ["obs"]
+    image: grafana/loki:3.2.0
+    command: ["-config.file=/etc/loki/local-config.yaml"]
+    ports:
+      - "3100:3100"
+
+  tempo:
+    profiles: ["obs"]
+    image: grafana/tempo:2.6.0
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml:ro
+    ports:
+      - "3200:3200"
+
+  grafana:
+    profiles: ["obs"]
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+      - loki
+      - tempo
+
+volumes:
+  db_data:

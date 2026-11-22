@@ -1,0 +1,23 @@
+# Build artifacts
+bin/
+dist/
+coverage.out
+coverage.html
+*.test
+
+# Terraform
+infra/**/.terraform/
+infra/**/.terraform.lock.hcl
+infra/**/terraform.tfstate*
+infra/**/terraform.tfvars
+infra/**/*.tfplan
+
+# Node
+ui/node_modules/
+ui/dist/
+ui/coverage/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
