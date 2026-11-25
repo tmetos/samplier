@@ -294,7 +294,8 @@ Root path: `/ogc`. Conformance target: **OGC API — Features, Part 1: Core**
 | Features | `/ogc/collections/{collectionId}/items` | GeoJSON FeatureCollection |
 | Feature | `/ogc/collections/{collectionId}/items/{featureId}` | Single GeoJSON feature |
 | Basemap style | `/ogc/basemap/style.json` | Self-hosted MapLibre style (no external sources) |
-| Basemap data | `/ogc/basemap/land`, `/ogc/basemap/boundaries` | Embedded Natural Earth GeoJSON |
+| Basemap data | `/ogc/basemap/land`, `/ogc/basemap/boundaries` | Embedded Natural Earth GeoJSON (default provider) |
+| Basemap sprites | `/ogc/basemap/sprite.png`, `/ogc/basemap/sprite.json` | Bundled Dark Matter sprite (OpenMapTiles provider) |
 | API definition | `/ogc/api` (OpenAPI 3.0) | Service description (`service-desc` link) |
 
 ### 7.2 Conformance classes declared
@@ -340,16 +341,18 @@ Pages/screens:
 1. **Dashboard** — company-wide metrics (projects, sampling events, locations,
    samples, results, imports); a navigable project grid; quick actions; and a
    recent-activity feed (EDD imports and record changes, newest first).
-2. **Map** — MapLibre on a **self-hosted basemap** (embedded Natural Earth land,
-   lakes, rivers and boundaries served by the API; no external tile service or API
-   keys). Project **boundaries are true polygons** — real site footprints stored
-   as `Polygon`/`MultiPolygon` geometry, rendered as a solid fill with a continuous
+2. **Map** — MapLibre on a **self-hosted basemap** with two providers (no external
+   tile service or API keys): embedded Natural Earth land/lakes/rivers/boundaries
+   served by the API, or the OpenMapTiles **Dark Matter** vector-tile theme served
+   from a self-hosted tile server (`BASEMAP_PROVIDER=openmaptiles`). Project
+   **boundaries are true polygons** — real site footprints stored as
+   `Polygon`/`MultiPolygon` geometry, rendered as a solid fill with a continuous
    outline and a soft outer glow (dashed outlines read as a point set at small
-   sizes), with
-   point locations filtered to markers so either geometry type works; chip
-   toggles with per-collection counts and a colour legend; popups on click. The
-   view auto-frames the project extent, an adaptive graticule supplies scale
-   context, and a clear message replaces the map if WebGL is unavailable.
+   sizes), with point locations filtered to markers so either geometry type works;
+   chip toggles with per-collection counts and a colour legend; popups on click.
+   The view auto-frames the project extent, an adaptive graticule supplies scale
+   context on the Natural Earth provider, and a clear message replaces the map if
+   WebGL is unavailable.
 3. **Projects** — master/detail: select a project from a list and the workspace
    loads only that project's boundary (rendered as a polygon on a small map, with
    its vertex count), overview, tasks, locations and samples, each in its own tab
@@ -569,7 +572,7 @@ Everything in this specification is implemented and verified.
 | Keycloak OIDC/SSO | Done | live realm + token accepted; `docs/keycloak.md` |
 | Observability (logs/traces/metrics) | Done | `internal/telemetry`; OTel + Grafana dev stack |
 | React + MapLibre UI | Done | `ui/` — map, projects, results, limits, import, exports |
-| Self-hosted basemap | Done | `internal/basemap` (100% coverage); no external tile service or API keys |
+| Self-hosted basemap | Done | `internal/basemap` (100% coverage); Natural Earth + OpenMapTiles/Dark Matter, no external tile service or API keys |
 | Terraform (AWS + GCP) | Done | `infra/`; `terraform validate` passes for both |
 | Docker image + CI/CD | Done | `Dockerfile`, `ci.yml`, `image.yml`, `release.yml` |
 | Test coverage ≥ 80% | Done | Backend 83.8%; UI 100% on `lib/` |

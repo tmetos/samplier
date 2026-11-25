@@ -19,6 +19,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/samplier/samplier/internal/app"
+	"github.com/samplier/samplier/internal/basemap"
 	"github.com/samplier/samplier/internal/config"
 	"github.com/samplier/samplier/internal/db"
 	"github.com/samplier/samplier/internal/mcp"
@@ -86,6 +87,12 @@ func serve(cfg config.Config, logger *slog.Logger) {
 		OIDCClientID:   cfg.OIDCClientID,
 		MaxUploadBytes: cfg.MaxUploadBytes,
 		Version:        Version,
+		Basemap: basemap.Config{
+			Provider:  cfg.BasemapProvider,
+			TileURL:   cfg.BasemapTileURL,
+			GlyphsURL: cfg.BasemapGlyphsURL,
+			SpriteURL: cfg.BasemapSpriteURL,
+		},
 	}, logger)
 
 	httpServer := &http.Server{

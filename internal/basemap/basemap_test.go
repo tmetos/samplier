@@ -144,6 +144,8 @@ func TestHandlerServesStyleAndData(t *testing.T) {
 		{"/style.json", "application/geo+json", "Samplier"},
 		{"/land", "application/geo+json", "FeatureCollection"},
 		{"/boundaries", "application/geo+json", "FeatureCollection"},
+		{"/lakes", "application/geo+json", "FeatureCollection"},
+		{"/rivers", "application/geo+json", "FeatureCollection"},
 	}
 
 	for _, tc := range cases {
@@ -291,6 +293,179 @@ func TestAreaLayersUseValidProperties(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestOpenMapTilesStyleStructure(t *testing.T) {
+	st := StyleFor("/ogc", Config{Provider: "openmaptiles"})
+
+	if st["version"] != 8 {
+		t.Errorf("version = %v, want 8", st["version"])
+	}
+	if meta := st["metadata"].(map[string]any); meta["samplier:basemap"] != "openmaptiles" {
+		t.Errorf("metadata samplier:basemap = %v", meta["samplier:basemap"])
+	}
+
+	sources, ok := st["sources"].(map[string]any)
+	if !ok {
+		t.Fatal("sources missing")
+	}
+	omt, ok := sources["openmaptiles"].(map[string]any)
+	if !ok {
+		t.Fatal("missing openmaptiles source")
+	}
+	if omt["type"] != "vector" {
+		t.Errorf("openmaptiles type = %v, want vector", omt["type"])
+	}
+	if omt["url"] != "http://localhost:8082/data/openmaptiles.json" {
+		t.Errorf("openmaptiles url = %v", omt["url"])
+	}
+	for _, want := range []string{"samplier-projects", "samplier-tasks", "samplier-locations", "samplier-samples"} {
+		if _, ok := sources[want]; !ok {
+			t.Errorf("missing source %q", want)
+		}
+	}
+
+	if st["glyphs"] != "http://localhost:8082/fonts/{fontstack}/{range}.pbf" {
+		t.Errorf("glyphs = %v", st["glyphs"])
+	}
+	if st["sprite"] != "sprite" {
+		t.Errorf("sprite = %v", st["sprite"])
+	}
+
+	layers := st["layers"].([]any)
+	ids := map[string]bool{}
+	for _, l := range layers {
+		m := l.(map[string]any)
+		ids[m["id"].(string)] = true
+	}
+	for _, want := range []string{"background", "water", "building", "place_city", "samplier-locations", "samplier-projects-fill"} {
+		if !ids[want] {
+			t.Errorf("missing layer %q", want)
+		}
+	}
+
+	// Every non-background layer must reference a declared source.
+	for _, l := range layers {
+		m := l.(map[string]any)
+		src, has := m["source"].(string)
+		if !has {
+			continue // background layer
+		}
+		if _, ok := sources[src]; !ok {
+			t.Errorf("layer %q references unknown source %q", m["id"], src)
+		}
+	}
+}
+
+func TestOpenMapTilesTileURLForms(t *testing.T) {
+	template := StyleFor("/ogc", Config{Provider: "openmaptiles", TileURL: "http://tiles.local/{z}/{x}/{y}.pbf"})
+	src := template["sources"].(map[string]any)["openmaptiles"].(map[string]any)
+	if _, ok := src["tiles"]; !ok {
+		t.Error("template URL should produce a tiles list, not a url")
+	}
+	if _, ok := src["url"]; ok {
+		t.Error("template URL must not set url")
+	}
+
+	tilejson := StyleFor("/ogc", Config{Provider: "openmaptiles", TileURL: "http://tiles.local/data/openmaptiles.json"})
+	src = tilejson["sources"].(map[string]any)["openmaptiles"].(map[string]any)
+	if src["url"] != "http://tiles.local/data/openmaptiles.json" {
+		t.Errorf("url = %v", src["url"])
+	}
+	if _, ok := src["tiles"]; ok {
+		t.Error("TileJSON URL must not set tiles")
+	}
+}
+
+func TestOpenMapTilesStyleHasNoMapTilerDependencies(t *testing.T) {
+	raw, err := json.Marshal(StyleFor("/ogc", Config{Provider: "openmaptiles"}))
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	for _, banned := range []string{"api.maptiler.com", "{key}"} {
+		if strings.Contains(string(raw), banned) {
+			t.Errorf("style must not depend on MapTiler cloud (%q present)", banned)
+		}
+	}
+}
+
+func TestHandlerServesSprites(t *testing.T) {
+	srv := httptest.NewServer(http.StripPrefix("/ogc/basemap", HandlerFor(Config{Provider: "openmaptiles"})))
+	defer srv.Close()
+
+	cases := []struct {
+		path        string
+		wantType    string
+		wantContent string
+	}{
+		{"/sprite.json", "application/json", "wood-pattern"},
+		{"/sprite.png", "image/png", ""},
+		{"/sprite@2x.json", "application/json", "wood-pattern"},
+		{"/sprite@2x.png", "image/png", ""},
+	}
+
+	for _, tc := range cases {
+		resp, err := http.Get(srv.URL + "/ogc/basemap" + tc.path)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.path, err)
+		}
+		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("%s: status %d", tc.path, resp.StatusCode)
+		}
+		if ct := resp.Header.Get("Content-Type"); ct != tc.wantType {
+			t.Errorf("%s: content-type %q, want %q", tc.path, ct, tc.wantType)
+		}
+		if tc.wantContent != "" && !strings.Contains(string(body), tc.wantContent) {
+			t.Errorf("%s: body missing %q", tc.path, tc.wantContent)
+		}
+	}
+
+	// Unknown sprite names must 404 rather than serve an empty body.
+	resp, err := http.Get(srv.URL + "/ogc/basemap/sprite-missing.png")
+	if err != nil {
+		t.Fatalf("missing sprite: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Errorf("unknown sprite status = %d, want 404", resp.StatusCode)
+	}
+}
+
+func TestServeSpriteUnknownName(t *testing.T) {
+	rr := httptest.NewRecorder()
+	serveSprite(rr, "sprite-missing.png")
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("status = %d, want 404", rr.Code)
+	}
+
+	if _, _, ok := spriteRoute("sprite-missing.png"); ok {
+		t.Error("spriteRoute must reject unknown names")
+	}
+}
+
+func TestGeometryFilterSingleType(t *testing.T) {
+	f := geometryFilter("Point")
+	if len(f) != 3 || f[0] != "==" {
+		t.Fatalf("single-type filter = %v", f)
+	}
+	if _, ok := f[1].([]any); !ok {
+		t.Fatalf("geometry-type must be an expression: %v", f[1])
+	}
+}
+
+func TestDarkMatterLayersPanicsOnInvalidEmbed(t *testing.T) {
+	orig := darkMatterLayersJSON
+	t.Cleanup(func() { darkMatterLayersJSON = orig })
+
+	darkMatterLayersJSON = []byte("{not valid json")
+	defer func() {
+		if recover() == nil {
+			t.Error("expected panic for invalid embedded layers")
+		}
+	}()
+	darkMatterLayers()
 }
 
 // TestBoundaryRendersAsArea locks in the "site boundary" look: a continuous
