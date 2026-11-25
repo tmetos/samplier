@@ -38,6 +38,8 @@ type Config struct {
 	MaxUploadBytes int64
 	// Version is reported by /healthz and the OGC landing page.
 	Version string
+	// Basemap selects the self-hosted basemap provider and endpoints.
+	Basemap basemap.Config
 }
 
 // Server bundles the assembled HTTP handler and its dependencies.
@@ -76,9 +78,9 @@ func New(pool *pgxpool.Pool, cfg Config, logger *slog.Logger) *Server {
 		})
 	})
 
-	// Self-hosted MapLibre basemap (style + embedded Natural Earth GeoJSON).
+	// Self-hosted MapLibre basemap (Natural Earth or OpenMapTiles/Dark Matter).
 	// Registered at the top level so StripPrefix sees the absolute path.
-	basemapHandler := http.StripPrefix("/ogc/basemap", basemap.Handler())
+	basemapHandler := http.StripPrefix("/ogc/basemap", basemap.HandlerFor(cfg.Basemap))
 	r.Handle("/ogc/basemap", basemapHandler)
 	r.Handle("/ogc/basemap/*", basemapHandler)
 

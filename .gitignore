@@ -1,5 +1,6 @@
 # Build artifacts
-bin/
+bin/*
+!bin/fetch-openmaptiles.sh
 dist/
 coverage.out
 coverage.html
@@ -16,6 +17,10 @@ infra/**/*.tfplan
 ui/node_modules/
 ui/dist/
 ui/coverage/
+
+# OpenMapTiles basemap data (downloaded by bin/fetch-openmaptiles.sh)
+tiles/*.mbtiles
+tiles/fonts/
 
 # OS / editor
 .DS_Store

@@ -17,17 +17,34 @@ type Config struct {
 
 	// MaxUploadBytes caps EDD uploads (default 32 MiB).
 	MaxUploadBytes int64
+
+	// Basemap selects the self-hosted basemap provider. "natural-earth" (the
+	// default) uses the embedded GeoJSON; "openmaptiles" uses the OpenMapTiles
+	// "Dark Matter" vector-tile theme served from a self-hosted tile server.
+	BasemapProvider string
+	// BasemapTileURL is the TileJSON URL or {z}/{x}/{y} tile template for the
+	// OpenMapTiles provider.
+	BasemapTileURL string
+	// BasemapGlyphsURL is the {fontstack}/{range}.pbf template for labels.
+	BasemapGlyphsURL string
+	// BasemapSpriteURL overrides the sprite base URL; empty serves the bundled
+	// Dark Matter sprite from this API.
+	BasemapSpriteURL string
 }
 
 // FromEnv builds a Config from the process environment, applying dev defaults.
 func FromEnv() Config {
 	return Config{
-		Port:           getenv("PORT", "8080"),
-		DatabaseURL:    getenv("DATABASE_URL", "postgres://samplier:samplier@localhost:5432/samplier"),
-		AuthEnabled:    os.Getenv("AUTH_ENABLED") == "true",
-		OIDCIssuer:     os.Getenv("OIDC_ISSUER"),
-		OIDCClientID:   os.Getenv("OIDC_CLIENT_ID"),
-		MaxUploadBytes: int64(getenvInt("MAX_UPLOAD_BYTES", 32<<20)),
+		Port:             getenv("PORT", "8080"),
+		DatabaseURL:      getenv("DATABASE_URL", "postgres://samplier:samplier@localhost:5432/samplier"),
+		AuthEnabled:      os.Getenv("AUTH_ENABLED") == "true",
+		OIDCIssuer:       os.Getenv("OIDC_ISSUER"),
+		OIDCClientID:     os.Getenv("OIDC_CLIENT_ID"),
+		MaxUploadBytes:   int64(getenvInt("MAX_UPLOAD_BYTES", 32<<20)),
+		BasemapProvider:  getenv("BASEMAP_PROVIDER", "natural-earth"),
+		BasemapTileURL:   getenv("BASEMAP_TILE_URL", ""),
+		BasemapGlyphsURL: getenv("BASEMAP_GLYPHS_URL", ""),
+		BasemapSpriteURL: getenv("BASEMAP_SPRITE_URL", ""),
 	}
 }
 

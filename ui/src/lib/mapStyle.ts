@@ -1,6 +1,18 @@
 /** Shared MapLibre style URL: served by the API, no external tiles. */
 export const STYLE_URL = '/ogc/basemap/style.json'
 
+/** Style metadata value that marks the embedded Natural Earth basemap. */
+export const BASEMAP_NATURAL_EARTH = 'natural-earth-110m'
+
+/**
+ * The embedded Natural Earth basemap has no detail at site scale, so it needs
+ * an adaptive graticule for geographic context. The OpenMapTiles basemap
+ * carries its own roads, landuse and labels and needs none.
+ */
+export function needsGraticule(metadata: Record<string, unknown> | undefined): boolean {
+  return metadata?.['samplier:basemap'] === BASEMAP_NATURAL_EARTH
+}
+
 /**
  * Build a lat/lon graticule sized to the current zoom. Natural Earth at 1:110m
  * has no detail at site scale, so these reference lines give the map geographic

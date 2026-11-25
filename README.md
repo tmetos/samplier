@@ -49,9 +49,10 @@ regulator-ready exports.
 - **Exports** — formatted XLSX crosstab, CSV, WQX/ESAR (XML), AQS (pipe + XML),
   Washington State EIM (CSV + XML)
 - **OGC API — Features** — `/ogc` collections for projects, tasks, locations, samples
-- **Self-hosted basemap** — embedded Natural Earth land, lakes, rivers and country
-  boundaries served as a MapLibre style, plus an adaptive lat/lon graticule for
-  scale context. No external tile service, no API keys, no third-party requests
+- **Self-hosted basemap** — two providers, no API keys, no third-party requests:
+  an embedded Natural Earth (land/lakes/rivers/boundaries) MapLibre style by
+  default, or the OpenMapTiles **Dark Matter** vector-tile theme served from a
+  self-hosted tile server
 - **MCP server** — 9 tools for agent-driven queries, reports, and exports
 - **Observability** — structured JSON logs, OTel traces (10% sampling), metrics
 
@@ -108,6 +109,28 @@ cd ui && npm install && npm run dev   # http://localhost:5173
 make mcp
 ```
 
+### OpenMapTiles basemap (self-hosted, Dark Matter)
+
+Swap the embedded Natural Earth basemap for the full OpenMapTiles **Dark Matter**
+theme (streets, landuse, buildings, labels) served by a self-hosted tile server:
+
+```bash
+# Download an OpenMapTiles MBTiles extract + Dark Matter glyph fonts
+make omt-fetch          # or: bin/fetch-openmaptiles.sh
+
+# Start TileServer GL on :8082
+make omt-up             # or: docker compose --profile basemap up -d tileserver
+
+# Run the API with the OpenMapTiles provider
+BASEMAP_PROVIDER=openmaptiles make run
+```
+
+The fetch script defaults to a small Zurich sample so you can try it immediately;
+point `OMT_MBTILES_URL` at a region extract (e.g. from
+<https://data.maptiler.com/downloads/>) for real data. The API generates the
+Dark Matter style and overlays Samplier's OGC collections on top, so the map
+stays self-hosted end to end.
+
 ## Authentication
 
 Samplier validates OIDC bearer tokens (Keycloak by default). See
@@ -133,6 +156,10 @@ make run
 | `OIDC_ISSUER` | — | e.g. `https://idp/realms/samplier` |
 | `OIDC_CLIENT_ID` | — | Expected `aud` |
 | `MAX_UPLOAD_BYTES` | `33554432` | EDD upload cap (32 MiB) |
+| `BASEMAP_PROVIDER` | `natural-earth` | `natural-earth` or `openmaptiles` |
+| `BASEMAP_TILE_URL` | `http://localhost:8082/data/openmaptiles.json` | TileJSON URL or `{z}/{x}/{y}` template |
+| `BASEMAP_GLYPHS_URL` | `http://localhost:8082/fonts/{fontstack}/{range}.pbf` | Glyph font template |
+| `BASEMAP_SPRITE_URL` | — | Sprite base URL (empty serves the bundled Dark Matter sprite) |
 | `LOG_LEVEL` | `info` | `debug`/`info`/`warn`/`error` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — | Enable OTLP/gRPC export |
 
@@ -152,6 +179,7 @@ GET /ogc/basemap/land                          embedded Natural Earth land
 GET /ogc/basemap/lakes                         embedded major lakes
 GET /ogc/basemap/rivers                        embedded major rivers
 GET /ogc/basemap/boundaries                    embedded country boundaries
+GET /ogc/basemap/sprite.png|json               Dark Matter sprite (OpenMapTiles)
 ```
 
 **REST API** (auth-guarded when `AUTH_ENABLED=true`)

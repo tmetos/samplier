@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import maplibregl, { type Map as MapLibreMap } from 'maplibre-gl'
 import { ogcCollection } from '../lib/api'
-import { STYLE_URL, graticule } from '../lib/mapStyle'
+import { STYLE_URL, graticule, needsGraticule } from '../lib/mapStyle'
 
 /**
  * The basemap is fully self-hosted: the API serves a MapLibre style document
- * plus embedded Natural Earth land/boundary GeoJSON, so the browser makes no
- * third-party tile requests and needs no API key.
+ * (embedded Natural Earth GeoJSON or self-hosted OpenMapTiles vector tiles),
+ * so the browser makes no third-party tile requests and needs no API key.
  */
 
 interface CollectionSpec {
@@ -102,6 +102,9 @@ export function MapPage() {
   const [error, setError] = useState<string | null>(null)
   const [counts, setCounts] = useState<Record<string, number>>({})
   const [bounds, setBounds] = useState<[[number, number], [number, number]] | null>(null)
+  const [basemapMeta, setBasemapMeta] = useState<Record<string, unknown> | undefined>({
+    'samplier:basemap': 'natural-earth-110m',
+  })
   const [visible, setVisible] = useState<Record<string, boolean>>(
     Object.fromEntries(COLLECTIONS.map((c) => [c.id, c.defaultOn])),
   )
@@ -132,7 +135,10 @@ export function MapPage() {
     m.addControl(new maplibregl.NavigationControl(), 'top-right')
     m.addControl(new maplibregl.ScaleControl({ unit: 'imperial' }), 'bottom-left')
 
-    m.on('load', () => setReady(true))
+    m.on('load', () => {
+      setReady(true)
+      setBasemapMeta(m.getStyle().metadata as Record<string, unknown> | undefined)
+    })
     m.on('error', (e) => {
       const msg = e?.error?.message
       if (msg && !msg.includes('sprite') && !msg.includes('glyphs')) setError(msg)
@@ -235,10 +241,12 @@ export function MapPage() {
     }
   }, [ready])
 
-  // Keep a graticule in sync with the zoom level.
+  // Keep a graticule in sync with the zoom level. Only the embedded Natural
+  // Earth basemap needs one; OpenMapTiles carries its own detail and labels.
+  const showGraticule = needsGraticule(basemapMeta)
   useEffect(() => {
     const m = map.current
-    if (!m || !ready) return
+    if (!m || !ready || !showGraticule) return
 
     const sync = () => {
       const data = graticule(m.getZoom())
@@ -270,7 +278,7 @@ export function MapPage() {
     return () => {
       m.off('moveend', sync)
     }
-  }, [ready])
+  }, [ready, showGraticule])
 
   // Toggle visibility of every sub-layer belonging to a collection.
   useEffect(() => {
@@ -299,8 +307,9 @@ export function MapPage() {
     <>
       <h1>Map</h1>
       <p className="sub">
-        Self-hosted MapLibre basemap with Samplier features from the OGC API — no external tile
-        service or API key.
+        {showGraticule
+          ? 'Self-hosted MapLibre basemap (embedded Natural Earth) with Samplier features from the OGC API — no external tile service or API key.'
+          : 'OpenMapTiles · Dark Matter — self-hosted vector tiles with Samplier features from the OGC API.'}
       </p>
 
       <div className="panel">

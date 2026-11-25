@@ -1,4 +1,4 @@
-.PHONY: help build test cover cover-check lint fmt run docker up down clean mcp demo demo-data demo-reset
+.PHONY: help build test cover cover-check lint fmt run docker up down clean mcp demo demo-data demo-reset omt-fetch omt-up omt-stop
 
 DATABASE_URL ?= postgres://samplier:samplier@localhost:5432/samplier
 COVERAGE_MIN ?= 80
@@ -57,6 +57,15 @@ demo-reset: ## Recreate the demo dataset and restart the API
 
 demo-api: ## Start the demo API only
 	./demo/run.sh --api-only
+
+omt-fetch: ## Download the OpenMapTiles basemap (MBTiles + Dark Matter fonts)
+	./bin/fetch-openmaptiles.sh
+
+omt-up: ## Start the self-hosted OpenMapTiles tile server
+	docker compose --profile basemap up -d tileserver || docker-compose --profile basemap up -d tileserver
+
+omt-stop: ## Stop the self-hosted OpenMapTiles tile server
+	docker compose stop tileserver || docker-compose stop tileserver
 
 clean: ## Remove build artifacts
 	rm -rf bin coverage.out dist

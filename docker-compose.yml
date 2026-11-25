@@ -42,6 +42,18 @@ services:
       - "8081:8080"
       - "9000:9000"
 
+  # Self-hosted OpenMapTiles vector tiles (MBTiles + glyph fonts). Opt-in via
+  # the "basemap" profile; run bin/fetch-openmaptiles.sh first to populate
+  # ./tiles. The API serves the Dark Matter style and Samplier overlays.
+  tileserver:
+    profiles: ["basemap"]
+    image: maptiler/tileserver-gl:latest
+    command: ["--public_url", "http://localhost:8082"]
+    ports:
+      - "8082:8080"
+    volumes:
+      - ./tiles:/data
+
   # --- observability (profile: obs) ---
   otel-collector:
     profiles: ["obs"]
