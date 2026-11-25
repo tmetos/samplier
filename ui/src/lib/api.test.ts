@@ -1,5 +1,16 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ApiError, formatResult, ogcCollection, qs } from './api'
+import { ApiError, formatDay, formatResult, ogcCollection, ogcFeature, qs } from './api'
+
+describe('formatDay', () => {
+  it('keeps only the calendar date of an RFC3339 timestamp', () => {
+    expect(formatDay('2024-03-09T23:30:00Z')).toBe('2024-03-09')
+  })
+
+  it('returns an empty string for missing input', () => {
+    expect(formatDay(undefined)).toBe('')
+    expect(formatDay(null)).toBe('')
+  })
+})
 
 describe('qs', () => {
   it('returns empty string when no params', () => {
@@ -50,6 +61,28 @@ describe('ApiError', () => {
     expect(err.message).toBe('not found')
     expect(err.name).toBe('ApiError')
     expect(err).toBeInstanceOf(Error)
+  })
+})
+
+describe('ogcFeature', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it('fetches a single feature by id', async () => {
+    const feature = { type: 'Feature', properties: { name: 'Site A' }, geometry: null }
+    const spy = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValue(new Response(JSON.stringify(feature), { status: 200 }))
+
+    const res = await ogcFeature('projects', 'p1')
+    expect(res.properties.name).toBe('Site A')
+    expect(spy.mock.calls[0][0]).toBe('/ogc/collections/projects/items/p1')
+  })
+
+  it('throws ApiError when the feature is missing', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response('missing', { status: 404, statusText: 'Not Found' }),
+    )
+    await expect(ogcFeature('projects', 'nope')).rejects.toThrow(ApiError)
   })
 })
 
@@ -198,6 +231,17 @@ describe('api client', () => {
       '/api/v1/exports/CSV?project_id=p1',
     )
     expect(api.exportUrl('WQX', { projectId: 'p1', type: 'EPA' })).toContain('type=EPA')
+  })
+
+  it('fetches company stats and activity', async () => {
+    const spy = mockJson({ items: [] })
+    const { api } = await import('./api')
+    await api.stats()
+    await api.activity()
+    await api.activity(5)
+    expect(spy.mock.calls[0][0]).toBe('/api/v1/stats')
+    expect(spy.mock.calls[1][0]).toBe('/api/v1/activity?limit=20')
+    expect(spy.mock.calls[2][0]).toBe('/api/v1/activity?limit=5')
   })
 
   it('surfaces the API error message from the body', async () => {
