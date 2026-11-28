@@ -103,6 +103,17 @@ func New(pool *pgxpool.Pool, cfg Config, logger *slog.Logger) *Server {
 		gr.Get("/api/v1/exports/formats", ex.formats)
 		gr.Get("/api/v1/exports/{format}", ex.download)
 		gr.Get("/api/v1/exceedances", ex.exceedances)
+
+		rp := &reportHandlers{pool: pool, store: st, logger: logger}
+		gr.Post("/api/v1/reports/preview", rp.preview)
+		gr.Post("/api/v1/reports/export", rp.export)
+		gr.Get("/api/v1/reports", rp.list)
+		gr.Post("/api/v1/reports", rp.create)
+		gr.Get("/api/v1/reports/{id}", rp.get)
+		gr.Put("/api/v1/reports/{id}", rp.update)
+		gr.Delete("/api/v1/reports/{id}", rp.delete)
+		gr.Get("/api/v1/reports/{id}/preview", rp.previewSaved)
+		gr.Get("/api/v1/reports/{id}/export", rp.exportSaved)
 	})
 
 	// Wrap for tracing/metrics (RED).
@@ -488,7 +499,7 @@ func (h *exportHandlers) loadRows(r *http.Request, f resultFilters) ([]export.Ro
 	args = append(args, 20000)
 
 	query := `
-SELECT p.code, p.name, l.name, COALESCE(l.loc_type,''), ST_X(l.geometry), ST_Y(l.geometry),
+SELECT p.id::text, p.code, p.name, l.name, COALESCE(l.loc_type,''), ST_X(l.geometry), ST_Y(l.geometry),
        s.name, COALESCE(s.sample_type,''), COALESCE(s.matrix,''), s.sample_datetime,
        s.start_depth, s.end_depth, COALESCE(s.depth_unit,''), COALESCE(tk.code,''),
        ts.test_id, COALESCE(ts.analytic_method,''), COALESCE(ts.fraction,''),
@@ -520,7 +531,7 @@ LIMIT $` + fmt.Sprint(len(args))
 	for dbRows.Next() {
 		var row export.Row
 		if err := dbRows.Scan(
-			&row.ProjectCode, &row.ProjectName, &row.LocationName, &row.LocationType,
+			&row.ProjectID, &row.ProjectCode, &row.ProjectName, &row.LocationName, &row.LocationType,
 			&row.Longitude, &row.Latitude, &row.SampleName, &row.SampleType,
 			&row.Matrix, &row.SampleDate, &row.StartDepth, &row.EndDepth,
 			&row.DepthUnit, &row.TaskCode, &row.TestID, &row.Method, &row.Fraction,

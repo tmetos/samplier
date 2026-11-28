@@ -13,6 +13,7 @@ import (
 // Row is the neutral, fully-denormalised representation of one analytical
 // result used by every exporter.
 type Row struct {
+	ProjectID     string
 	ProjectCode   string
 	ProjectName   string
 	LocationName  string
@@ -52,6 +53,34 @@ type Row struct {
 	ActionLevel      *float64
 	Exceeded         bool
 	ExceedanceNote   string
+
+	// Exceedances records every limit set this result breaches (multiple
+	// regulatory limit sets can be selected in custom reports).
+	Exceedances []Exceedance
+}
+
+// Exceedance is one limit-set breach.
+type Exceedance struct {
+	Group string
+	Type  string
+	Level *float64
+	Note  string
+}
+
+// ExceededGroups returns the distinct group codes this result exceeds.
+func (r Row) ExceededGroups() []string {
+	out := make([]string, 0, len(r.Exceedances))
+	seen := map[string]bool{}
+	for _, e := range r.Exceedances {
+		if e.Group != "" && !seen[e.Group] {
+			seen[e.Group] = true
+			out = append(out, e.Group)
+		}
+	}
+	if len(out) == 0 && r.Exceeded && r.ActionLevelGroup != "" {
+		out = append(out, r.ActionLevelGroup)
+	}
+	return out
 }
 
 // ReportedValue renders the human-readable result: "<DL" for non-detects.

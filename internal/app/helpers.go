@@ -7,6 +7,7 @@ import (
 
 	"github.com/samplier/samplier/internal/actionlevel"
 	"github.com/samplier/samplier/internal/export"
+	"github.com/samplier/samplier/internal/store"
 	"github.com/samplier/samplier/internal/units"
 )
 
@@ -29,6 +30,91 @@ func (h *exportHandlers) applyActionLevels(r *http.Request, rows []export.Row, f
 		return err
 	}
 
+	agroups := toActionLevelGroups(groups)
+
+	for i := range rows {
+		row := &rows[i]
+		res := actionlevel.Result{
+			AnalyteID:      row.AnalyteID,
+			Value:          row.ResultNumeric,
+			DetectFlag:     row.DetectFlag,
+			Unit:           row.Units,
+			DetectionLimit: row.DetectionLimit(),
+			DetectionUnit:  row.LimitUnit,
+			Fraction:       row.Fraction,
+			AnalyticMethod: row.Method,
+			Matrix:         row.Matrix,
+			ProjectID:      row.ProjectID,
+			SampleDate:     row.SampleDate,
+			Depth:          row.StartDepth,
+		}
+		cmps, cmpErr := actionlevel.Evaluate(res, agroups, conv)
+		if cmpErr != nil {
+			continue // incomparable units must not fail the report
+		}
+		for _, c := range cmps {
+			if c.Verdict == actionlevel.VerdictExceed ||
+				c.Verdict == actionlevel.VerdictNonDetectExceed {
+				row.Exceeded = true
+				row.ActionLevelGroup = c.GroupCode
+				row.ActionLevelType = c.TypeCode
+				limit := c.Limit
+				row.ActionLevel = &limit
+				break
+			}
+		}
+	}
+	return nil
+}
+
+// buildUnitTable builds a conversion table from the database.
+func buildUnitTable(ctx context.Context, st *store.Store) (*units.Table, error) {
+	rows, err := st.ListConversions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rules := make([]units.Conversion, 0, len(rows))
+	for _, r := range rows {
+		c := units.Conversion{
+			ReportedUnit:     r.ReportedUnit,
+			TargetUnit:       r.TargetUnit,
+			ConversionFactor: r.ConversionFactor,
+			Delta:            r.Delta,
+		}
+		if r.Formula != nil {
+			c.Formula = *r.Formula
+		}
+		rules = append(rules, c)
+	}
+	return units.NewTable(rules), nil
+}
+
+// unitTable builds a conversion table from the database (export handlers).
+func (h *exportHandlers) unitTable(ctx context.Context) (*units.Table, error) {
+	return buildUnitTable(ctx, h.store)
+}
+
+// exportDay renders a sample timestamp as a UTC calendar date.
+func exportDay(t time.Time) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.UTC().Format("2006-01-02")
+}
+
+func parseDay(s *string) *time.Time {
+	if s == nil || *s == "" {
+		return nil
+	}
+	if t, err := time.Parse("2006-01-02", *s); err == nil {
+		return &t
+	}
+	return nil
+}
+
+// toActionLevelGroups converts store-level action level groups into the
+// comparison engine's representation.
+func toActionLevelGroups(groups []store.ActionLevelGroup) []actionlevel.Group {
 	agroups := make([]actionlevel.Group, 0, len(groups))
 	for _, g := range groups {
 		ag := actionlevel.Group{ID: g.ID, TypeCode: g.TypeCode, Code: g.Code, Name: g.Name}
@@ -60,78 +146,5 @@ func (h *exportHandlers) applyActionLevels(r *http.Request, rows []export.Row, f
 		}
 		agroups = append(agroups, ag)
 	}
-
-	for i := range rows {
-		row := &rows[i]
-		res := actionlevel.Result{
-			AnalyteID:      row.AnalyteID,
-			Value:          row.ResultNumeric,
-			DetectFlag:     row.DetectFlag,
-			Unit:           row.Units,
-			DetectionLimit: row.DetectionLimit(),
-			DetectionUnit:  row.LimitUnit,
-			Fraction:       row.Fraction,
-			AnalyticMethod: row.Method,
-			Matrix:         row.Matrix,
-			ProjectID:      f.ProjectID,
-			SampleDate:     row.SampleDate,
-			Depth:          row.StartDepth,
-		}
-		cmps, cmpErr := actionlevel.Evaluate(res, agroups, conv)
-		if cmpErr != nil {
-			continue // incomparable units must not fail the report
-		}
-		for _, c := range cmps {
-			if c.Verdict == actionlevel.VerdictExceed ||
-				c.Verdict == actionlevel.VerdictNonDetectExceed {
-				row.Exceeded = true
-				row.ActionLevelGroup = c.GroupCode
-				row.ActionLevelType = c.TypeCode
-				limit := c.Limit
-				row.ActionLevel = &limit
-				break
-			}
-		}
-	}
-	return nil
-}
-
-// unitTable builds a conversion table from the database.
-func (h *exportHandlers) unitTable(ctx context.Context) (*units.Table, error) {
-	rows, err := h.store.ListConversions(ctx)
-	if err != nil {
-		return nil, err
-	}
-	rules := make([]units.Conversion, 0, len(rows))
-	for _, r := range rows {
-		c := units.Conversion{
-			ReportedUnit:     r.ReportedUnit,
-			TargetUnit:       r.TargetUnit,
-			ConversionFactor: r.ConversionFactor,
-			Delta:            r.Delta,
-		}
-		if r.Formula != nil {
-			c.Formula = *r.Formula
-		}
-		rules = append(rules, c)
-	}
-	return units.NewTable(rules), nil
-}
-
-// exportDay renders a sample timestamp as a UTC calendar date.
-func exportDay(t time.Time) string {
-	if t.IsZero() {
-		return ""
-	}
-	return t.UTC().Format("2006-01-02")
-}
-
-func parseDay(s *string) *time.Time {
-	if s == nil || *s == "" {
-		return nil
-	}
-	if t, err := time.Parse("2006-01-02", *s); err == nil {
-		return &t
-	}
-	return nil
+	return agroups
 }
