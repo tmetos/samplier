@@ -314,3 +314,47 @@ tr.is-exceed td:first-child { box-shadow: inset 3px 0 0 var(--exceed); }
   border: 1px dashed var(--border); border-radius: 8px;
   color: var(--muted); font-size: 12px; background: var(--panel-2);
 }
+
+/* ---------------------------------------------------------------------------
+   Custom reports
+   --------------------------------------------------------------------------- */
+
+.report-layout { display: grid; grid-template-columns: 360px 1fr; gap: 18px; align-items: start; }
+.report-side { display: flex; flex-direction: column; gap: 18px; }
+.report-main { min-width: 0; }
+
+.field { margin-bottom: 12px; }
+.field > label { display: block; margin-bottom: 6px; }
+.field input, .field select { width: 100%; box-sizing: border-box; }
+.hint { color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+.check-list {
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 180px; overflow-y: auto;
+  border: 1px solid var(--border); border-radius: 6px; padding: 8px;
+  background: var(--panel-2);
+}
+.check-list.tall { max-height: 240px; }
+.check { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; font-size: 13px; }
+.check input { margin-top: 2px; }
+.check span { line-height: 1.35; }
+
+button.linkish {
+  background: none; border: 0; padding: 0; color: var(--blue);
+  font-weight: 600; font-size: 13px; cursor: pointer; text-align: left;
+}
+button.linkish:hover { color: var(--green-bright); }
+
+.preview-tab { margin-bottom: 22px; }
+.preview-tab h3 { margin: 0 0 10px; }
+.preview-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+
+table.crosstab th, table.crosstab td { white-space: nowrap; min-width: 64px; }
+table.crosstab th:first-child, table.crosstab td:first-child { min-width: 160px; position: sticky; left: 0; background: var(--panel); }
+
+.cell-flag { font-size: 10px; color: var(--muted); margin-top: 2px; }
+.cell-flag-exceed { color: var(--exceed); font-weight: 600; }
+
+@media (max-width: 1080px) {
+  .report-layout { grid-template-columns: 1fr; }
+}

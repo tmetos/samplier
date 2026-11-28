@@ -13,6 +13,7 @@ import { ResultsPage } from './pages/ResultsPage'
 import { ActionLevelsPage } from './pages/ActionLevelsPage'
 import { ImportPage } from './pages/ImportPage'
 import { ExportsPage } from './pages/ExportsPage'
+import { ReportsPage } from './pages/ReportsPage'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
@@ -25,6 +26,7 @@ const nav = [
   { to: '/results', label: 'Results' },
   { to: '/action-levels', label: 'Action Levels' },
   { to: '/import', label: 'EDD Import' },
+  { to: '/reports', label: 'Custom Reports' },
   { to: '/exports', label: 'Reports & Exports' },
 ]
 
@@ -65,6 +67,7 @@ function Shell() {
           <Route path="/results" element={<ResultsPage />} />
           <Route path="/action-levels" element={<ActionLevelsPage />} />
           <Route path="/import" element={<ImportPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
           <Route path="/exports" element={<ExportsPage />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>

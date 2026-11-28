@@ -100,6 +100,86 @@ export interface ActionLevelGroup {
   parameters?: ActionLevelParameter[]
 }
 
+export interface AnalyteGroupMember {
+  id: string
+  analyte_id: string
+  analyte_name?: string
+  cas_rn?: string
+  matrix?: string
+  fraction?: string
+  default_units?: string
+  display_order: number
+}
+
+export interface AnalyteGroup {
+  id: string
+  code: string
+  name: string
+  description?: string
+  analytes?: AnalyteGroupMember[]
+}
+
+export interface ReportSpec {
+  name?: string
+  description?: string
+  title?: string
+  project_id?: string
+  analyte_ids?: string[]
+  analyte_group_ids?: string[]
+  action_level_group_ids?: string[]
+  include_non_detects?: boolean
+  detects_only?: boolean
+  location_filter?: string
+  start_date?: string
+  end_date?: string
+}
+
+export interface ReportView extends ReportSpec {
+  id: string
+  include_non_detects: boolean
+  created_at: string
+  updated_at: string
+}
+
+export interface ReportCell {
+  value: string
+  flags: string
+  exceeded: boolean
+  non_detect: boolean
+}
+
+export interface ReportSampleColumn {
+  location: string
+  date: string
+  sample: string
+}
+
+export interface ReportPreviewRow {
+  analyte: string
+  cas_rn?: string
+  unit: string
+  cells: ReportCell[]
+}
+
+export interface ReportPreviewTab {
+  key: string
+  label: string
+  analyte_count: number
+  result_count: number
+  exceedance_count: number
+  sample_columns: ReportSampleColumn[]
+  rows: ReportPreviewRow[]
+}
+
+export interface ReportPreview {
+  title: string
+  project_code?: string
+  project_name?: string
+  action_level_groups: string[]
+  exceedance_count: number
+  tabs: ReportPreviewTab[]
+}
+
 export interface ProjectSummary {
   id: string
   code: string
@@ -281,6 +361,48 @@ export const api = {
   /** Trigger a file download for an export format. */
   exportUrl: (format: string, params: { projectId: string; type?: string }) =>
     `${BASE}/exports/${format}${qs({ project_id: params.projectId, type: params.type })}`,
+
+  listAnalyteGroups: () => request<{ items: AnalyteGroup[] }>('/analyte-groups'),
+
+  listReportViews: () => request<{ items: ReportView[] }>('/reports'),
+  getReportView: (id: string) => request<ReportView>(`/reports/${id}`),
+  saveReportView: (spec: ReportSpec) =>
+    request<ReportView>('/reports', { method: 'POST', body: JSON.stringify(spec) }),
+  updateReportView: (id: string, spec: ReportSpec) =>
+    request<ReportView>(`/reports/${id}`, { method: 'PUT', body: JSON.stringify(spec) }),
+  deleteReportView: (id: string) =>
+    request<void>(`/reports/${id}`, { method: 'DELETE' }),
+
+  previewReport: (spec: ReportSpec) =>
+    request<ReportPreview>('/reports/preview', { method: 'POST', body: JSON.stringify(spec) }),
+
+  /** Download a custom report workbook (POST body carries the spec). */
+  async exportReport(spec: ReportSpec, filename = 'report_crosstab.xlsx'): Promise<void> {
+    const res = await fetch(`${BASE}/reports/export`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(spec),
+    })
+    if (!res.ok) {
+      let message = res.statusText
+      try {
+        const body = (await res.json()) as { error?: string }
+        if (body.error) message = body.error
+      } catch {
+        /* non-JSON error body */
+      }
+      throw new ApiError(res.status, message)
+    }
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  },
 }
 
 /** Fetch a single OGC feature (e.g. a project boundary). */

@@ -1039,6 +1039,283 @@ func (s *Store) Stats(ctx context.Context) (CompanyStats, error) {
 	return st, rows.Err()
 }
 
+// ---------------------------------------------------------------------------
+// Analyte groups (reporting tab sets)
+// ---------------------------------------------------------------------------
+
+// AnalyteGroup is a named set of analytes, used as a crosstab tab in reports.
+type AnalyteGroup struct {
+	ID          string               `json:"id"`
+	Code        string               `json:"code"`
+	Name        string               `json:"name"`
+	Description string               `json:"description,omitempty"`
+	Analytes    []AnalyteGroupMember `json:"analytes,omitempty"`
+}
+
+// AnalyteGroupMember is one analyte inside a group.
+type AnalyteGroupMember struct {
+	ID           string  `json:"id"`
+	AnalyteID    string  `json:"analyte_id"`
+	AnalyteName  string  `json:"analyte_name,omitempty"`
+	CASRN        string  `json:"cas_rn,omitempty"`
+	Matrix       *string `json:"matrix,omitempty"`
+	Fraction     *string `json:"fraction,omitempty"`
+	DefaultUnits *string `json:"default_units,omitempty"`
+	DisplayOrder int     `json:"display_order"`
+}
+
+// ListAnalyteGroups returns every analyte group with its ordered members.
+func (s *Store) ListAnalyteGroups(ctx context.Context) ([]AnalyteGroup, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT id, code, name, COALESCE(description, '') FROM analyte_group ORDER BY code`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	groups := make([]AnalyteGroup, 0)
+	byID := map[string]int{}
+	for rows.Next() {
+		var g AnalyteGroup
+		if err := rows.Scan(&g.ID, &g.Code, &g.Name, &g.Description); err != nil {
+			return nil, err
+		}
+		byID[g.ID] = len(groups)
+		groups = append(groups, g)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(groups) == 0 {
+		return groups, nil
+	}
+
+	ids := make([]string, 0, len(groups))
+	for _, g := range groups {
+		ids = append(ids, g.ID)
+	}
+	mrows, err := s.pool.Query(ctx,
+		`SELECT m.id, m.group_id, m.analyte_id, a.chemical_name, COALESCE(a.cas_rn, ''),
+		        m.matrix, m.fraction, m.default_units, m.display_order
+		 FROM analyte_group_member m JOIN analyte a ON a.id = m.analyte_id
+		 WHERE m.group_id = ANY($1)
+		 ORDER BY m.display_order, a.chemical_name`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer mrows.Close()
+
+	for mrows.Next() {
+		var m AnalyteGroupMember
+		var groupID string
+		if err := mrows.Scan(&m.ID, &groupID, &m.AnalyteID, &m.AnalyteName, &m.CASRN,
+			&m.Matrix, &m.Fraction, &m.DefaultUnits, &m.DisplayOrder); err != nil {
+			return nil, err
+		}
+		if i, ok := byID[groupID]; ok {
+			groups[i].Analytes = append(groups[i].Analytes, m)
+		}
+	}
+	return groups, mrows.Err()
+}
+
+// ---------------------------------------------------------------------------
+// Saved report views
+// ---------------------------------------------------------------------------
+
+// ReportView is a saved custom crosstab report.
+type ReportView struct {
+	ID                  string    `json:"id"`
+	Name                string    `json:"name"`
+	Description         string    `json:"description,omitempty"`
+	Title               string    `json:"title,omitempty"`
+	ProjectID           *string   `json:"project_id,omitempty"`
+	AnalyteIDs          []string  `json:"analyte_ids,omitempty"`
+	AnalyteGroupIDs     []string  `json:"analyte_group_ids,omitempty"`
+	ActionLevelGroupIDs []string  `json:"action_level_group_ids,omitempty"`
+	IncludeNonDetects   bool      `json:"include_non_detects"`
+	DetectsOnly         bool      `json:"detects_only"`
+	LocationFilter      string    `json:"location_filter,omitempty"`
+	StartDate           *string   `json:"start_date,omitempty"`
+	EndDate             *string   `json:"end_date,omitempty"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+const reportViewColumns = `id, name, COALESCE(description,''), COALESCE(title,''),
+	project_id, analyte_ids::text[], analyte_group_ids::text[],
+	action_level_group_ids::text[], include_non_detects, detects_only,
+	COALESCE(location_filter,''), start_date::text, end_date::text, created_at, updated_at`
+
+func scanReportView(row pgx.Row) (ReportView, error) {
+	var v ReportView
+	err := row.Scan(&v.ID, &v.Name, &v.Description, &v.Title, &v.ProjectID,
+		&v.AnalyteIDs, &v.AnalyteGroupIDs, &v.ActionLevelGroupIDs,
+		&v.IncludeNonDetects, &v.DetectsOnly, &v.LocationFilter,
+		&v.StartDate, &v.EndDate, &v.CreatedAt, &v.UpdatedAt)
+	return v, err
+}
+
+// ListReportViews returns saved report views, newest first.
+func (s *Store) ListReportViews(ctx context.Context) ([]ReportView, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT `+reportViewColumns+` FROM report_view ORDER BY created_at DESC LIMIT 200`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]ReportView, 0)
+	for rows.Next() {
+		v, err := scanReportView(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, v)
+	}
+	return out, rows.Err()
+}
+
+// GetReportView fetches a saved report view by id.
+func (s *Store) GetReportView(ctx context.Context, id string) (ReportView, error) {
+	v, err := scanReportView(s.pool.QueryRow(ctx,
+		`SELECT `+reportViewColumns+` FROM report_view WHERE id=$1`, id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ReportView{}, ErrNotFound
+	}
+	return v, err
+}
+
+// CreateReportView inserts a saved report view.
+func (s *Store) CreateReportView(ctx context.Context, v ReportView) (ReportView, error) {
+	if v.AnalyteIDs == nil {
+		v.AnalyteIDs = []string{}
+	}
+	if v.AnalyteGroupIDs == nil {
+		v.AnalyteGroupIDs = []string{}
+	}
+	if v.ActionLevelGroupIDs == nil {
+		v.ActionLevelGroupIDs = []string{}
+	}
+	out, err := scanReportView(s.pool.QueryRow(ctx,
+		`INSERT INTO report_view (name, description, title, project_id,
+		        analyte_ids, analyte_group_ids, action_level_group_ids,
+		        include_non_detects, detects_only, location_filter, start_date, end_date)
+		 VALUES ($1,$2,$3,$4,$5::uuid[],$6::uuid[],$7::uuid[],$8,$9,$10,$11::date,$12::date)
+		 RETURNING `+reportViewColumns,
+		v.Name, v.Description, v.Title, v.ProjectID, v.AnalyteIDs, v.AnalyteGroupIDs,
+		v.ActionLevelGroupIDs, v.IncludeNonDetects, v.DetectsOnly, v.LocationFilter,
+		v.StartDate, v.EndDate))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ReportView{}, ErrNotFound
+	}
+	return out, err
+}
+
+// UpdateReportView replaces a saved report view.
+func (s *Store) UpdateReportView(ctx context.Context, id string, v ReportView) (ReportView, error) {
+	if v.AnalyteIDs == nil {
+		v.AnalyteIDs = []string{}
+	}
+	if v.AnalyteGroupIDs == nil {
+		v.AnalyteGroupIDs = []string{}
+	}
+	if v.ActionLevelGroupIDs == nil {
+		v.ActionLevelGroupIDs = []string{}
+	}
+	out, err := scanReportView(s.pool.QueryRow(ctx,
+		`UPDATE report_view SET
+		   name=$2, description=$3, title=$4, project_id=$5,
+		   analyte_ids=$6::uuid[], analyte_group_ids=$7::uuid[],
+		   action_level_group_ids=$8::uuid[], include_non_detects=$9,
+		   detects_only=$10, location_filter=$11, start_date=$12::date, end_date=$13::date
+		 WHERE id=$1 RETURNING `+reportViewColumns,
+		id, v.Name, v.Description, v.Title, v.ProjectID, v.AnalyteIDs, v.AnalyteGroupIDs,
+		v.ActionLevelGroupIDs, v.IncludeNonDetects, v.DetectsOnly, v.LocationFilter,
+		v.StartDate, v.EndDate))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ReportView{}, ErrNotFound
+	}
+	return out, err
+}
+
+// DeleteReportView removes a saved report view.
+func (s *Store) DeleteReportView(ctx context.Context, id string) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM report_view WHERE id=$1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// ListActionLevelGroupsByIDs returns specific action level groups with parameters.
+func (s *Store) ListActionLevelGroupsByIDs(ctx context.Context, ids []string) ([]ActionLevelGroup, error) {
+	if len(ids) == 0 {
+		return []ActionLevelGroup{}, nil
+	}
+	query := `SELECT g.id, t.code, g.code, g.name, g.matrix, g.fraction,
+	                 g.project_id, g.start_date::text, g.end_date::text
+	          FROM action_level g JOIN action_level_type t ON t.id = g.type_id
+	          WHERE g.id = ANY($1) ORDER BY t.code, g.code`
+	rows, err := s.pool.Query(ctx, query, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	groups := make([]ActionLevelGroup, 0)
+	byID := map[string]int{}
+	for rows.Next() {
+		var g ActionLevelGroup
+		if err := rows.Scan(&g.ID, &g.TypeCode, &g.Code, &g.Name, &g.Matrix,
+			&g.Fraction, &g.ProjectID, &g.StartDate, &g.EndDate); err != nil {
+			return nil, err
+		}
+		byID[g.ID] = len(groups)
+		groups = append(groups, g)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return s.attachActionLevelParameters(ctx, groups, byID)
+}
+
+// attachActionLevelParameters loads parameters for the given groups in place.
+func (s *Store) attachActionLevelParameters(ctx context.Context, groups []ActionLevelGroup, byID map[string]int) ([]ActionLevelGroup, error) {
+	if len(groups) == 0 {
+		return groups, nil
+	}
+	ids := make([]string, 0, len(groups))
+	for _, g := range groups {
+		ids = append(ids, g.ID)
+	}
+	prows, err := s.pool.Query(ctx,
+		`SELECT p.id, p.action_level_id, p.analyte_id, a.chemical_name, a.cas_rn,
+		        p.action_level, p.action_level_min, p.unit, p.fraction, p.analytic_method
+		 FROM action_level_parameter p JOIN analyte a ON a.id = p.analyte_id
+		 WHERE p.action_level_id = ANY($1) ORDER BY a.chemical_name`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer prows.Close()
+
+	for prows.Next() {
+		var p ActionLevelParameter
+		var groupID string
+		if err := prows.Scan(&p.ID, &groupID, &p.AnalyteID, &p.AnalyteName, &p.CASRN,
+			&p.ActionLevel, &p.ActionLevelMin, &p.Unit, &p.Fraction, &p.AnalyticMethod); err != nil {
+			return nil, err
+		}
+		if i, ok := byID[groupID]; ok {
+			groups[i].Parameters = append(groups[i].Parameters, p)
+		}
+	}
+	return groups, prows.Err()
+}
+
 // ActivityEvent is one entry in the recent-activity feed.
 type ActivityEvent struct {
 	Kind      string    `json:"kind"` // import | sample | project | task

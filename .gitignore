@@ -26,3 +26,4 @@ tiles/fonts/
 .DS_Store
 .idea/
 .vscode/
+ui/tsconfig.tsbuildinfo

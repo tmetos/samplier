@@ -298,7 +298,12 @@ func rowFlag(r Row) string {
 		parts = append(parts, r.ValQualifier)
 	}
 	if r.Exceeded {
-		parts = append(parts, "EXCEED")
+		groups := r.ExceededGroups()
+		if len(groups) > 0 {
+			parts = append(parts, "EXCEED:"+strings.Join(groups, "+"))
+		} else {
+			parts = append(parts, "EXCEED")
+		}
 	}
 	return strings.Join(parts, ",")
 }

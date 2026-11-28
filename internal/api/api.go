@@ -70,6 +70,7 @@ func (h *Handler) Routes() http.Handler {
 	r.Get("/analytes", h.listAnalytes)
 	r.Post("/analytes", h.createAnalyte)
 	r.Get("/analytes/{id}", h.getAnalyte)
+	r.Get("/analyte-groups", h.listAnalyteGroups)
 
 	r.Get("/units", h.listUnits)
 	r.Get("/unit-conversions", h.listConversions)
@@ -522,6 +523,15 @@ func (h *Handler) listAnalytes(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, listResponse{Items: items, Limit: limit, Offset: offset})
+}
+
+func (h *Handler) listAnalyteGroups(w http.ResponseWriter, r *http.Request) {
+	items, err := h.store.ListAnalyteGroups(r.Context())
+	if err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
 func (h *Handler) createAnalyte(w http.ResponseWriter, r *http.Request) {

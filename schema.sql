@@ -442,6 +442,31 @@ CREATE TABLE edd_validation_error (
 CREATE INDEX idx_edd_error_batch ON edd_validation_error (edd_batch_id);
 
 -- =============================================================================
+-- 8b. SAVED REPORT VIEWS (custom crosstab reports)
+-- =============================================================================
+
+CREATE TABLE report_view (
+  id                     uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name                   text NOT NULL,
+  description            text,
+  title                  text,
+  project_id             uuid REFERENCES project(id) ON DELETE CASCADE,
+  analyte_ids            uuid[] NOT NULL DEFAULT '{}',
+  analyte_group_ids      uuid[] NOT NULL DEFAULT '{}',
+  action_level_group_ids uuid[] NOT NULL DEFAULT '{}',
+  include_non_detects    boolean NOT NULL DEFAULT true,
+  detects_only           boolean NOT NULL DEFAULT false,
+  location_filter        text,
+  start_date             date,
+  end_date               date,
+  config                 jsonb NOT NULL DEFAULT '{}',
+  created_by             uuid REFERENCES app_user(id),
+  created_at             timestamptz NOT NULL DEFAULT now(),
+  updated_at             timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_report_view_project ON report_view (project_id);
+
+-- =============================================================================
 -- 9. updated_at triggers
 -- =============================================================================
 DO $$
@@ -450,7 +475,7 @@ DECLARE
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'app_user','project','task','location','well','well_segment','sample','batch',
-    'test','result','action_level','action_level_parameter','analyte'
+    'test','result','action_level','action_level_parameter','analyte','report_view'
   ] LOOP
     EXECUTE format('CREATE TRIGGER trg_%I_updated_at BEFORE UPDATE ON %I
                     FOR EACH ROW EXECUTE FUNCTION set_updated_at()', t, t);

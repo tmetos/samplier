@@ -113,6 +113,30 @@ ON CONFLICT (cas_rn) DO UPDATE
       short_name = EXCLUDED.short_name;
 
 -- ---------------------------------------------------------------------------
+-- Analyte grouping sets (each group becomes a crosstab tab in custom reports)
+-- ---------------------------------------------------------------------------
+INSERT INTO analyte_group (code, name, description) VALUES
+  ('DEMO-METALS', 'Metals',     'Inorganic metals by ICP-MS (EPA 6020B)'),
+  ('DEMO-VOCS',   'VOCs',       'Volatile organic compounds by GC/MS (EPA 8260D)')
+ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name, description = EXCLUDED.description;
+
+INSERT INTO analyte_group_member (group_id, analyte_id, matrix, display_order)
+SELECT g.id, a.id, 'WATER', v.ord
+FROM analyte_group g
+JOIN (VALUES
+  ('DEMO-METALS', '7439-92-1', 1),  -- Lead
+  ('DEMO-METALS', '7440-38-2', 2),  -- Arsenic
+  ('DEMO-METALS', '7440-43-9', 3),  -- Cadmium
+  ('DEMO-METALS', '7440-47-3', 4),  -- Chromium
+  ('DEMO-VOCS',   '71-43-2',   1),  -- Benzene
+  ('DEMO-VOCS',   '79-01-6',   2),  -- TCE
+  ('DEMO-VOCS',   '127-18-4',  3),  -- PCE
+  ('DEMO-VOCS',   '75-01-4',   4)   -- Vinyl chloride
+) AS v(code, cas_rn, ord) ON v.code = g.code
+JOIN analyte a ON a.cas_rn = v.cas_rn
+ON CONFLICT (group_id, analyte_id, matrix, fraction) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
 -- Samples: 3 wells x 2 quarters, including a field duplicate
 -- ---------------------------------------------------------------------------
 INSERT INTO sample (task_id, location_id, name, sample_type, matrix,

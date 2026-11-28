@@ -48,6 +48,9 @@ regulator-ready exports.
   per-row validation reports, and three commit modes
 - **Exports** — formatted XLSX crosstab, CSV, WQX/ESAR (XML), AQS (pipe + XML),
   Washington State EIM (CSV + XML)
+- **Custom reports** — pick analytes or analyte grouping sets, evaluate against
+  one or more regulatory limit sets, preview the crosstab in the UI, export a
+  multi-tab Excel workbook (one tab per grouping set), and save views for reuse
 - **OGC API — Features** — `/ogc` collections for projects, tasks, locations, samples
 - **Self-hosted basemap** — two providers, no API keys, no third-party requests:
   an embedded Natural Earth (land/lakes/rivers/boundaries) MapLibre style by
@@ -186,7 +189,8 @@ GET /ogc/basemap/sprite.png|json               Dark Matter sprite (OpenMapTiles)
 
 ```
 /api/v1/projects, /tasks, /locations, /samples, /tests, /results
-/api/v1/analytes, /units, /unit-conversions, /action-levels
+/api/v1/analytes, /units, /unit-conversions, /action-levels, /analyte-groups
+/api/v1/reports (custom report views: preview, export, save/list)
 /api/v1/locations/{id}/well-segments
 /api/v1/edd/validate, /api/v1/edd/load, /api/v1/edd/formats, /api/v1/edd/batches
 /api/v1/exports/formats, /api/v1/exports/{format}, /api/v1/exceedances
