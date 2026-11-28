@@ -89,6 +89,14 @@ export interface ActionLevelParameter {
   action_level: number
   action_level_min?: number
   unit: string
+  fraction?: string
+  analytic_method?: string
+}
+
+export interface ActionLevelType {
+  code: string
+  name: string
+  description?: string
 }
 
 export interface ActionLevelGroup {
@@ -97,6 +105,10 @@ export interface ActionLevelGroup {
   code: string
   name: string
   matrix?: string
+  fraction?: string
+  project_id?: string
+  start_date?: string
+  end_date?: string
   parameters?: ActionLevelParameter[]
 }
 
@@ -337,11 +349,53 @@ export const api = {
 
   listAnalytes: (limit = 500) =>
     request<ListResponse<Analyte>>(`/analytes${qs({ limit })}`),
+  createAnalyte: (a: Partial<Analyte>) =>
+    request<Analyte>('/analytes', { method: 'POST', body: JSON.stringify(a) }),
+  updateAnalyte: (id: string, a: Partial<Analyte>) =>
+    request<Analyte>(`/analytes/${id}`, { method: 'PUT', body: JSON.stringify(a) }),
+  deleteAnalyte: (id: string) =>
+    request<void>(`/analytes/${id}`, { method: 'DELETE' }),
+
+  createAnalyteGroup: (g: Partial<AnalyteGroup>) =>
+    request<AnalyteGroup>('/analyte-groups', { method: 'POST', body: JSON.stringify(g) }),
+  updateAnalyteGroup: (id: string, g: Partial<AnalyteGroup>) =>
+    request<AnalyteGroup>(`/analyte-groups/${id}`, { method: 'PUT', body: JSON.stringify(g) }),
+  deleteAnalyteGroup: (id: string) =>
+    request<void>(`/analyte-groups/${id}`, { method: 'DELETE' }),
+  addAnalyteGroupMember: (groupId: string, m: Partial<AnalyteGroupMember>) =>
+    request<AnalyteGroupMember>(`/analyte-groups/${groupId}/members`, {
+      method: 'POST',
+      body: JSON.stringify(m),
+    }),
+  deleteAnalyteGroupMember: (groupId: string, memberId: string) =>
+    request<void>(`/analyte-groups/${groupId}/members/${memberId}`, { method: 'DELETE' }),
+
   listUnits: () => request<{ items: { code: string; name: string }[] }>('/units'),
   listActionLevels: (params: { type?: string; projectId?: string }) =>
     request<{ items: ActionLevelGroup[] }>(
       `/action-levels${qs({ type: params.type, project_id: params.projectId })}`,
     ),
+  listActionLevelTypes: () => request<{ items: ActionLevelType[] }>('/action-level-types'),
+  createActionLevelType: (t: Partial<ActionLevelType>) =>
+    request<ActionLevelType>('/action-level-types', { method: 'POST', body: JSON.stringify(t) }),
+  createActionLevelGroup: (g: { type_code: string; code: string; name: string; matrix?: string; fraction?: string; project_id?: string; start_date?: string; end_date?: string }) =>
+    request<{ id: string }>('/action-level-groups', { method: 'POST', body: JSON.stringify(g) }),
+  updateActionLevelGroup: (id: string, g: { type_code: string; code: string; name: string; matrix?: string; fraction?: string; project_id?: string; start_date?: string; end_date?: string }) =>
+    request<ActionLevelGroup>(`/action-level-groups/${id}`, { method: 'PUT', body: JSON.stringify(g) }),
+  deleteActionLevelGroup: (id: string) =>
+    request<void>(`/action-level-groups/${id}`, { method: 'DELETE' }),
+  createActionLevelParameter: (groupId: string, p: Partial<ActionLevelParameter>) =>
+    request<{ id: string }>(`/action-level-groups/${groupId}/parameters`, {
+      method: 'POST',
+      body: JSON.stringify(p),
+    }),
+  updateActionLevelParameter: (id: string, p: Partial<ActionLevelParameter>) =>
+    request<ActionLevelParameter>(`/action-level-parameters/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(p),
+    }),
+  deleteActionLevelParameter: (id: string) =>
+    request<void>(`/action-level-parameters/${id}`, { method: 'DELETE' }),
 
   exceedances: (projectId: string, type?: string) =>
     request<{ count: number; items: Record<string, unknown>[] }>(

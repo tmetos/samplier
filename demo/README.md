@@ -204,7 +204,12 @@ mg/L ↔ µg/L, mg/kg ↔ µg/kg, ft ↔ m, plus °F ↔ °C via a formula.
   count), plus **Overview**, **Tasks**, **Locations** and **Samples** tabs, each
   with its own counts. You can add a project, task or location inline
 - **Results** — exceedance table with red highlighting; switch EPA ↔ State to see more
-- **Action Levels** — both limit sets with per-analyte values
+- **Action Levels** — both limit sets with per-analyte values, plus full CRUD
+  for limit sets and their parameters
+- **Reference Data** — add/edit/delete analytes and analyte grouping sets, and
+  manage which analytes belong to each set
+- **Custom Reports** — build a multi-tab crosstab, preview it, export XLSX, and
+  save views for reuse
 - **EDD Import** — validate-only or commit, with inline error/warning rows
 - **Reports & Exports** — download each format; "Detects only" toggle
 

@@ -765,6 +765,34 @@ func (s *Store) FindAnalyteByCAS(ctx context.Context, cas string) (Analyte, erro
 	return a, err
 }
 
+// UpdateAnalyte replaces an analyte's fields.
+func (s *Store) UpdateAnalyte(ctx context.Context, id string, a Analyte) (Analyte, error) {
+	if a.Aliases == nil {
+		a.Aliases = []string{}
+	}
+	err := s.pool.QueryRow(ctx,
+		`UPDATE analyte SET cas_rn=$2, chemical_name=$3, short_name=$4, aliases=$5
+		 WHERE id=$1 RETURNING id, cas_rn, chemical_name, short_name, aliases`,
+		id, a.CASRN, a.ChemicalName, a.ShortName, a.Aliases).
+		Scan(&a.ID, &a.CASRN, &a.ChemicalName, &a.ShortName, &a.Aliases)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Analyte{}, ErrNotFound
+	}
+	return a, err
+}
+
+// DeleteAnalyte removes an analyte.
+func (s *Store) DeleteAnalyte(ctx context.Context, id string) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM analyte WHERE id=$1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // Unit is a measurement unit.
 type Unit struct {
 	Code     string  `json:"code"`
@@ -962,6 +990,109 @@ func (s *Store) CreateActionLevelParameter(ctx context.Context, groupID string, 
 	return id, err
 }
 
+// ActionLevelType is a regulatory jurisdiction (EPA, STATE, LOCAL, CUSTOM).
+type ActionLevelType struct {
+	Code        string `json:"code"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+}
+
+// ListActionLevelTypes returns all action level types.
+func (s *Store) ListActionLevelTypes(ctx context.Context) ([]ActionLevelType, error) {
+	rows, err := s.pool.Query(ctx,
+		`SELECT code, name, COALESCE(description, '') FROM action_level_type ORDER BY code`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]ActionLevelType, 0)
+	for rows.Next() {
+		var t ActionLevelType
+		if err := rows.Scan(&t.Code, &t.Name, &t.Description); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
+// GetActionLevelGroup fetches one group with its parameters.
+func (s *Store) GetActionLevelGroup(ctx context.Context, id string) (ActionLevelGroup, error) {
+	groups, err := s.ListActionLevelGroupsByIDs(ctx, []string{id})
+	if err != nil {
+		return ActionLevelGroup{}, err
+	}
+	if len(groups) == 0 {
+		return ActionLevelGroup{}, ErrNotFound
+	}
+	return groups[0], nil
+}
+
+// UpdateActionLevelGroup replaces a group's header fields.
+func (s *Store) UpdateActionLevelGroup(ctx context.Context, id string, g ActionLevelGroup) (ActionLevelGroup, error) {
+	var out ActionLevelGroup
+	err := s.pool.QueryRow(ctx,
+		`UPDATE action_level al SET
+		   type_id = COALESCE((SELECT t.id FROM action_level_type t WHERE t.code = $2), al.type_id),
+		   code = $3, name = $4, matrix = $5, fraction = $6,
+		   project_id = $7, start_date = $8::date, end_date = $9::date
+		 WHERE al.id = $1
+		 RETURNING al.id, (SELECT t.code FROM action_level_type t WHERE t.id = al.type_id),
+		           al.code, al.name, al.matrix, al.fraction, al.project_id,
+		           al.start_date::text, al.end_date::text`,
+		id, g.TypeCode, g.Code, g.Name, g.Matrix, g.Fraction, g.ProjectID,
+		g.StartDate, g.EndDate).
+		Scan(&out.ID, &out.TypeCode, &out.Code, &out.Name, &out.Matrix,
+			&out.Fraction, &out.ProjectID, &out.StartDate, &out.EndDate)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ActionLevelGroup{}, ErrNotFound
+	}
+	return out, err
+}
+
+// DeleteActionLevelGroup removes a group and its parameters.
+func (s *Store) DeleteActionLevelGroup(ctx context.Context, id string) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM action_level WHERE id=$1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// UpdateActionLevelParameter replaces a per-analyte limit.
+func (s *Store) UpdateActionLevelParameter(ctx context.Context, id string, p ActionLevelParameter) (ActionLevelParameter, error) {
+	err := s.pool.QueryRow(ctx,
+		`UPDATE action_level_parameter SET
+		   analyte_id=$2, action_level=$3, action_level_min=$4, unit=$5,
+		   fraction=$6, analytic_method=$7
+		 WHERE id=$1
+		 RETURNING id, analyte_id, action_level, action_level_min, unit, fraction, analytic_method`,
+		id, p.AnalyteID, p.ActionLevel, p.ActionLevelMin, p.Unit,
+		p.Fraction, p.AnalyticMethod).
+		Scan(&p.ID, &p.AnalyteID, &p.ActionLevel, &p.ActionLevelMin, &p.Unit,
+			&p.Fraction, &p.AnalyticMethod)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ActionLevelParameter{}, ErrNotFound
+	}
+	return p, err
+}
+
+// DeleteActionLevelParameter removes a per-analyte limit.
+func (s *Store) DeleteActionLevelParameter(ctx context.Context, id string) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM action_level_parameter WHERE id=$1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // ---------------------------------------------------------------------------
 // Company-wide statistics and activity (dashboard)
 // ---------------------------------------------------------------------------
@@ -1117,6 +1248,62 @@ func (s *Store) ListAnalyteGroups(ctx context.Context) ([]AnalyteGroup, error) {
 		}
 	}
 	return groups, mrows.Err()
+}
+
+// CreateAnalyteGroup inserts an analyte group (without members).
+func (s *Store) CreateAnalyteGroup(ctx context.Context, g AnalyteGroup) (AnalyteGroup, error) {
+	err := s.pool.QueryRow(ctx,
+		`INSERT INTO analyte_group (code, name, description)
+		 VALUES ($1,$2,$3) RETURNING id, code, name, COALESCE(description, '')`,
+		g.Code, g.Name, g.Description).Scan(&g.ID, &g.Code, &g.Name, &g.Description)
+	return g, err
+}
+
+// UpdateAnalyteGroup replaces an analyte group's header fields.
+func (s *Store) UpdateAnalyteGroup(ctx context.Context, id string, g AnalyteGroup) (AnalyteGroup, error) {
+	err := s.pool.QueryRow(ctx,
+		`UPDATE analyte_group SET code=$2, name=$3, description=$4
+		 WHERE id=$1 RETURNING id, code, name, COALESCE(description, '')`,
+		id, g.Code, g.Name, g.Description).Scan(&g.ID, &g.Code, &g.Name, &g.Description)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return AnalyteGroup{}, ErrNotFound
+	}
+	return g, err
+}
+
+// DeleteAnalyteGroup removes an analyte group and its members.
+func (s *Store) DeleteAnalyteGroup(ctx context.Context, id string) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM analyte_group WHERE id=$1`, id)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+// AddAnalyteGroupMember adds one analyte to a group.
+func (s *Store) AddAnalyteGroupMember(ctx context.Context, groupID string, m AnalyteGroupMember) (AnalyteGroupMember, error) {
+	err := s.pool.QueryRow(ctx,
+		`INSERT INTO analyte_group_member (group_id, analyte_id, matrix, fraction, default_units, display_order)
+		 VALUES ($1,$2,$3,$4,$5,$6)
+		 RETURNING id, group_id, analyte_id, matrix, fraction, default_units, display_order`,
+		groupID, m.AnalyteID, m.Matrix, m.Fraction, m.DefaultUnits, m.DisplayOrder).
+		Scan(&m.ID, &groupID, &m.AnalyteID, &m.Matrix, &m.Fraction, &m.DefaultUnits, &m.DisplayOrder)
+	return m, err
+}
+
+// DeleteAnalyteGroupMember removes one member by member id.
+func (s *Store) DeleteAnalyteGroupMember(ctx context.Context, memberID string) error {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM analyte_group_member WHERE id=$1`, memberID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------
