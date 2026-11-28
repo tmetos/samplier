@@ -11,6 +11,7 @@ import { MapPage } from './pages/MapPage'
 import { ProjectsPage } from './pages/ProjectsPage'
 import { ResultsPage } from './pages/ResultsPage'
 import { ActionLevelsPage } from './pages/ActionLevelsPage'
+import { ReferenceDataPage } from './pages/ReferenceDataPage'
 import { ImportPage } from './pages/ImportPage'
 import { ExportsPage } from './pages/ExportsPage'
 import { ReportsPage } from './pages/ReportsPage'
@@ -25,6 +26,7 @@ const nav = [
   { to: '/projects', label: 'Projects' },
   { to: '/results', label: 'Results' },
   { to: '/action-levels', label: 'Action Levels' },
+  { to: '/reference-data', label: 'Reference Data' },
   { to: '/import', label: 'EDD Import' },
   { to: '/reports', label: 'Custom Reports' },
   { to: '/exports', label: 'Reports & Exports' },
@@ -66,6 +68,7 @@ function Shell() {
           <Route path="/projects" element={<ProjectsPage />} />
           <Route path="/results" element={<ResultsPage />} />
           <Route path="/action-levels" element={<ActionLevelsPage />} />
+          <Route path="/reference-data" element={<ReferenceDataPage />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/exports" element={<ExportsPage />} />

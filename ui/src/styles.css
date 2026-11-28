@@ -358,3 +358,10 @@ table.crosstab th:first-child, table.crosstab td:first-child { min-width: 160px;
 @media (max-width: 1080px) {
   .report-layout { grid-template-columns: 1fr; }
 }
+
+.panel-inner {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+}

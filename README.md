@@ -51,6 +51,8 @@ regulator-ready exports.
 - **Custom reports** — pick analytes or analyte grouping sets, evaluate against
   one or more regulatory limit sets, preview the crosstab in the UI, export a
   multi-tab Excel workbook (one tab per grouping set), and save views for reuse
+- **Reference data management** — create, edit and delete analytes, analyte
+  grouping sets (and their members), and regulatory limit sets/parameters
 - **OGC API — Features** — `/ogc` collections for projects, tasks, locations, samples
 - **Self-hosted basemap** — two providers, no API keys, no third-party requests:
   an embedded Natural Earth (land/lakes/rivers/boundaries) MapLibre style by
@@ -190,6 +192,7 @@ GET /ogc/basemap/sprite.png|json               Dark Matter sprite (OpenMapTiles)
 ```
 /api/v1/projects, /tasks, /locations, /samples, /tests, /results
 /api/v1/analytes, /units, /unit-conversions, /action-levels, /analyte-groups
+/api/v1/action-level-types, /action-level-groups, /action-level-parameters
 /api/v1/reports (custom report views: preview, export, save/list)
 /api/v1/locations/{id}/well-segments
 /api/v1/edd/validate, /api/v1/edd/load, /api/v1/edd/formats, /api/v1/edd/batches

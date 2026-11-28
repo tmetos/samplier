@@ -398,6 +398,7 @@ CREATE TABLE action_level_parameter (
   fraction        text REFERENCES fraction(code),
   analytic_method text REFERENCES method(code),
   created_at      timestamptz NOT NULL DEFAULT now(),
+  updated_at      timestamptz NOT NULL DEFAULT now(),
   UNIQUE (action_level_id, analyte_id, unit, fraction, analytic_method)
 );
 CREATE INDEX idx_action_level_param_analyte ON action_level_parameter (analyte_id);

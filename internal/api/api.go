@@ -70,17 +70,31 @@ func (h *Handler) Routes() http.Handler {
 	r.Get("/analytes", h.listAnalytes)
 	r.Post("/analytes", h.createAnalyte)
 	r.Get("/analytes/{id}", h.getAnalyte)
+	r.Put("/analytes/{id}", h.updateAnalyte)
+	r.Delete("/analytes/{id}", h.deleteAnalyte)
 	r.Get("/analyte-groups", h.listAnalyteGroups)
+	r.Post("/analyte-groups", h.createAnalyteGroup)
+	r.Put("/analyte-groups/{id}", h.updateAnalyteGroup)
+	r.Delete("/analyte-groups/{id}", h.deleteAnalyteGroup)
+	r.Post("/analyte-groups/{id}/members", h.addAnalyteGroupMember)
+	r.Delete("/analyte-groups/{id}/members/{memberId}", h.deleteAnalyteGroupMember)
 
 	r.Get("/units", h.listUnits)
 	r.Get("/unit-conversions", h.listConversions)
 
+	r.Get("/action-level-types", h.listActionLevelTypes)
+	r.Post("/action-level-types", h.createActionLevelType)
 	r.Get("/action-levels", h.listActionLevels)
+	r.Get("/action-levels/{id}", h.getActionLevelGroup)
 
 	r.Get("/stats", h.stats)
 	r.Get("/activity", h.activity)
 	r.Post("/action-level-groups", h.createActionLevelGroup)
+	r.Put("/action-level-groups/{id}", h.updateActionLevelGroup)
+	r.Delete("/action-level-groups/{id}", h.deleteActionLevelGroup)
 	r.Post("/action-level-groups/{id}/parameters", h.createActionLevelParameter)
+	r.Put("/action-level-parameters/{id}", h.updateActionLevelParameter)
+	r.Delete("/action-level-parameters/{id}", h.deleteActionLevelParameter)
 
 	return r
 }
@@ -534,6 +548,76 @@ func (h *Handler) listAnalyteGroups(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
+func (h *Handler) createAnalyteGroup(w http.ResponseWriter, r *http.Request) {
+	var g store.AnalyteGroup
+	if err := decode(r, &g); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if g.Code == "" || g.Name == "" {
+		writeErr(w, http.StatusBadRequest, "code and name are required")
+		return
+	}
+	out, err := h.store.CreateAnalyteGroup(r.Context(), g)
+	if err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, out)
+}
+
+func (h *Handler) updateAnalyteGroup(w http.ResponseWriter, r *http.Request) {
+	var g store.AnalyteGroup
+	if err := decode(r, &g); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if g.Code == "" || g.Name == "" {
+		writeErr(w, http.StatusBadRequest, "code and name are required")
+		return
+	}
+	out, err := h.store.UpdateAnalyteGroup(r.Context(), chi.URLParam(r, "id"), g)
+	if err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) deleteAnalyteGroup(w http.ResponseWriter, r *http.Request) {
+	if err := h.store.DeleteAnalyteGroup(r.Context(), chi.URLParam(r, "id")); err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) addAnalyteGroupMember(w http.ResponseWriter, r *http.Request) {
+	var m store.AnalyteGroupMember
+	if err := decode(r, &m); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if m.AnalyteID == "" {
+		writeErr(w, http.StatusBadRequest, "analyte_id is required")
+		return
+	}
+	out, err := h.store.AddAnalyteGroupMember(r.Context(), chi.URLParam(r, "id"), m)
+	if err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, out)
+}
+
+func (h *Handler) deleteAnalyteGroupMember(w http.ResponseWriter, r *http.Request) {
+	if err := h.store.DeleteAnalyteGroupMember(r.Context(), chi.URLParam(r, "memberId")); err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) createAnalyte(w http.ResponseWriter, r *http.Request) {
 	var a store.Analyte
 	if err := decode(r, &a); err != nil {
@@ -559,6 +643,32 @@ func (h *Handler) getAnalyte(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, a)
+}
+
+func (h *Handler) updateAnalyte(w http.ResponseWriter, r *http.Request) {
+	var a store.Analyte
+	if err := decode(r, &a); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if a.ChemicalName == "" {
+		writeErr(w, http.StatusBadRequest, "chemical_name is required")
+		return
+	}
+	out, err := h.store.UpdateAnalyte(r.Context(), chi.URLParam(r, "id"), a)
+	if err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) deleteAnalyte(w http.ResponseWriter, r *http.Request) {
+	if err := h.store.DeleteAnalyte(r.Context(), chi.URLParam(r, "id")); err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) listUnits(w http.ResponseWriter, r *http.Request) {
@@ -612,6 +722,41 @@ func (h *Handler) listActionLevels(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"items": items})
 }
 
+func (h *Handler) getActionLevelGroup(w http.ResponseWriter, r *http.Request) {
+	g, err := h.store.GetActionLevelGroup(r.Context(), chi.URLParam(r, "id"))
+	if err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, g)
+}
+
+func (h *Handler) listActionLevelTypes(w http.ResponseWriter, r *http.Request) {
+	items, err := h.store.ListActionLevelTypes(r.Context())
+	if err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": items})
+}
+
+func (h *Handler) createActionLevelType(w http.ResponseWriter, r *http.Request) {
+	var t store.ActionLevelType
+	if err := decode(r, &t); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if t.Code == "" || t.Name == "" {
+		writeErr(w, http.StatusBadRequest, "code and name are required")
+		return
+	}
+	if err := h.store.CreateActionLevelType(r.Context(), t.Code, t.Name, t.Description); err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, t)
+}
+
 type createGroupRequest struct {
 	store.ActionLevelGroup
 	TypeCode string `json:"type_code"`
@@ -635,6 +780,32 @@ func (h *Handler) createActionLevelGroup(w http.ResponseWriter, r *http.Request)
 	writeJSON(w, http.StatusCreated, map[string]string{"id": id})
 }
 
+func (h *Handler) updateActionLevelGroup(w http.ResponseWriter, r *http.Request) {
+	var req createGroupRequest
+	if err := decode(r, &req); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if req.TypeCode == "" || req.Code == "" || req.Name == "" {
+		writeErr(w, http.StatusBadRequest, "type_code, code and name are required")
+		return
+	}
+	out, err := h.store.UpdateActionLevelGroup(r.Context(), chi.URLParam(r, "id"), req.ActionLevelGroup)
+	if err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) deleteActionLevelGroup(w http.ResponseWriter, r *http.Request) {
+	if err := h.store.DeleteActionLevelGroup(r.Context(), chi.URLParam(r, "id")); err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) createActionLevelParameter(w http.ResponseWriter, r *http.Request) {
 	var p store.ActionLevelParameter
 	if err := decode(r, &p); err != nil {
@@ -651,6 +822,32 @@ func (h *Handler) createActionLevelParameter(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]string{"id": id})
+}
+
+func (h *Handler) updateActionLevelParameter(w http.ResponseWriter, r *http.Request) {
+	var p store.ActionLevelParameter
+	if err := decode(r, &p); err != nil {
+		writeErr(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+	if p.AnalyteID == "" || p.Unit == "" {
+		writeErr(w, http.StatusBadRequest, "analyte_id and unit are required")
+		return
+	}
+	out, err := h.store.UpdateActionLevelParameter(r.Context(), chi.URLParam(r, "id"), p)
+	if err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (h *Handler) deleteActionLevelParameter(w http.ResponseWriter, r *http.Request) {
+	if err := h.store.DeleteActionLevelParameter(r.Context(), chi.URLParam(r, "id")); err != nil {
+		h.writeStoreErr(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // unused guard to keep time import meaningful for future timestamp handling.
